@@ -4,6 +4,7 @@ import (
 	"context"
 	"log-parser/internal/config"
 	"log-parser/internal/httpserver"
+	"log-parser/internal/storage"
 
 	"log"
 	"net/http"
@@ -18,9 +19,25 @@ func main() {
 
 	cfg := config.Load()
 
+	var store *storage.Store
+	if cfg.DatabaseURL != "" {
+		var err error
+		store, err = storage.New(ctx, cfg.DatabaseURL)
+		if err != nil {
+			log.Fatalf("connect database: %v", err)
+		}
+		defer store.Close()
+
+		if err := store.RunMigrations(ctx, cfg.MigrationsDir); err != nil {
+			log.Fatalf("run migrations: %v", err)
+		}
+	} else {
+		log.Println("DATABASE_URL is empty, parsed logs will not be saved")
+	}
+
 	mux := http.NewServeMux()
 
-	httpserver.Register(mux, cfg.DataDir)
+	httpserver.Register(mux, cfg.DataDir, store)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.AppPort,

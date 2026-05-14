@@ -1,17 +1,24 @@
 package httpserver
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log-parser/internal/models"
 	"log-parser/internal/parser"
 	"log/slog"
 	"net/http"
 	"time"
 )
 
+type Repository interface {
+	SaveParseResult(ctx context.Context, filePath string, result *models.ParseResult) (*models.Log, error)
+}
+
 type Server struct {
 	dataDir string
+	repo    Repository
 }
 
 type parseRequest struct {
@@ -30,8 +37,13 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func Register(mux *http.ServeMux, dataDir string) {
-	server := &Server{dataDir: dataDir}
+func Register(mux *http.ServeMux, dataDir string, repositories ...Repository) {
+	var repo Repository
+	if len(repositories) > 0 {
+		repo = repositories[0]
+	}
+
+	server := &Server{dataDir: dataDir, repo: repo}
 
 	mux.HandleFunc("/health", Health)
 	mux.HandleFunc("/api/v1/parse/", server.Parse)
@@ -79,10 +91,26 @@ func (s *Server) Parse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logID, err := newLogID()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "generate log id"})
-		return
+	logID := ""
+	if s.repo != nil {
+		logRecord, err := s.repo.SaveParseResult(r.Context(), request.Path, result)
+		if err != nil {
+			slog.Error("save parsed log failed",
+				"path", request.Path,
+				"duration_ms", time.Since(startedAt).Milliseconds(),
+				"error", err,
+			)
+			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "save parsed log"})
+			return
+		}
+		logID = logRecord.ID
+	} else {
+		var err error
+		logID, err = newLogID()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "generate log id"})
+			return
+		}
 	}
 
 	slog.Info("archive parsed",

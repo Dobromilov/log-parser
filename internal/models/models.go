@@ -1,5 +1,18 @@
 package models
 
+import "time"
+
+type Log struct {
+	ID           string
+	FilePath     string
+	Status       string
+	ErrorMessage *string
+	NodesCount   int
+	PortsCount   int
+	UploadedAt   time.Time
+	ParsedAt     *time.Time
+}
+
 type Node struct {
 	ExternalID string
 	Name       string

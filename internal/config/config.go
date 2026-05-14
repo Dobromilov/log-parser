@@ -3,8 +3,10 @@ package config
 import "os"
 
 type Config struct {
-	AppPort string
-	DataDir string
+	AppPort       string
+	DataDir       string
+	DatabaseURL   string
+	MigrationsDir string
 }
 
 func Load() Config {
@@ -18,8 +20,15 @@ func Load() Config {
 		dataDir = "data"
 	}
 
+	migrationsDir := os.Getenv("MIGRATIONS_DIR")
+	if migrationsDir == "" {
+		migrationsDir = "migrations"
+	}
+
 	return Config{
-		AppPort: port,
-		DataDir: dataDir,
+		AppPort:       port,
+		DataDir:       dataDir,
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		MigrationsDir: migrationsDir,
 	}
 }
