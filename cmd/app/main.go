@@ -16,11 +16,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	cfg := config.Load()
+
 	mux := http.NewServeMux()
 
-	httpserver.Register(mux)
-
-	cfg := config.Load()
+	httpserver.Register(mux, cfg.DataDir)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.AppPort,
