@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrNotFound = errors.New("not found")
 
 type Log struct {
 	ID           string
@@ -14,6 +19,8 @@ type Log struct {
 }
 
 type Node struct {
+	ID         string
+	LogID      string
 	ExternalID string
 	Name       string
 	Type       string
@@ -23,6 +30,9 @@ type Node struct {
 }
 
 type Port struct {
+	ID              string
+	LogID           string
+	NodeID          string
 	NodeGUID        string
 	PortGUID        string
 	PortNum         int
@@ -36,6 +46,9 @@ type Port struct {
 }
 
 type NodeInfo struct {
+	ID           string
+	LogID        string
+	NodeID       string
 	NodeGUID     string
 	SerialNumber string
 	PartNumber   string
@@ -48,4 +61,34 @@ type ParseResult struct {
 	Nodes     []Node
 	Ports     []Port
 	NodeInfos []NodeInfo
+}
+
+type TopologyNode struct {
+	ID         string
+	ExternalID string
+	Name       string
+	Type       string
+	NumPorts   int
+	PortsCount int
+}
+
+type TopologyGroup struct {
+	Type    string
+	NodeIDs []string
+	Count   int
+}
+
+type Topology struct {
+	LogID  string
+	Nodes  []TopologyNode
+	Groups []TopologyGroup
+	Links  []TopologyLink
+}
+
+type TopologyLink struct {
+	SourceNodeID string
+	SourcePortID string
+	TargetNodeID string
+	TargetPortID string
+	Confidence   string
 }

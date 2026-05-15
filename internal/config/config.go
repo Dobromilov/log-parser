@@ -7,6 +7,7 @@ type Config struct {
 	DataDir       string
 	DatabaseURL   string
 	MigrationsDir string
+	LogLevel      string
 }
 
 func Load() Config {
@@ -30,5 +31,6 @@ func Load() Config {
 		DataDir:       dataDir,
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		MigrationsDir: migrationsDir,
+		LogLevel:      os.Getenv("LOG_LEVEL"),
 	}
 }

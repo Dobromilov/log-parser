@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"log-parser/internal/config"
-	"log-parser/internal/httpserver"
-	"log-parser/internal/storage"
-
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"log-parser/internal/config"
+	"log-parser/internal/httpserver"
+	"log-parser/internal/storage"
 )
 
 func main() {
@@ -18,37 +19,45 @@ func main() {
 	defer stop()
 
 	cfg := config.Load()
+	configureLogger(cfg.LogLevel)
 
 	var store *storage.Store
 	if cfg.DatabaseURL != "" {
 		var err error
 		store, err = storage.New(ctx, cfg.DatabaseURL)
 		if err != nil {
-			log.Fatalf("connect database: %v", err)
+			slog.Error("connect database failed", "error", err)
+			os.Exit(1)
 		}
 		defer store.Close()
 
 		if err := store.RunMigrations(ctx, cfg.MigrationsDir); err != nil {
-			log.Fatalf("run migrations: %v", err)
+			slog.Error("run migrations failed", "error", err)
+			os.Exit(1)
 		}
 	} else {
-		log.Println("DATABASE_URL is empty, parsed logs will not be saved")
+		slog.Warn("database url is empty, parsed logs will not be saved")
 	}
 
 	mux := http.NewServeMux()
 
-	httpserver.Register(mux, cfg.DataDir, store)
+	if store != nil {
+		httpserver.Register(mux, cfg.DataDir, store)
+	} else {
+		httpserver.Register(mux, cfg.DataDir)
+	}
 
 	server := &http.Server{
 		Addr:              ":" + cfg.AppPort,
-		Handler:           mux,
+		Handler:           httpserver.LoggingMiddleware(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	go func() {
-		log.Println("server started on :" + cfg.AppPort)
+		slog.Info("server started", "port", cfg.AppPort)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen and serve: %v", err)
+			slog.Error("listen and serve failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -58,6 +67,25 @@ func main() {
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("shutdown app: %v", err)
+		slog.Error("shutdown app failed", "error", err)
+		os.Exit(1)
 	}
+}
+
+func configureLogger(level string) {
+	var slogLevel slog.Level
+	switch level {
+	case "debug":
+		slogLevel = slog.LevelDebug
+	case "warn":
+		slogLevel = slog.LevelWarn
+	case "error":
+		slogLevel = slog.LevelError
+	default:
+		slogLevel = slog.LevelInfo
+	}
+
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slogLevel,
+	})))
 }
