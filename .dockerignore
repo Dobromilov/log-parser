@@ -1,0 +1,6 @@
+.git
+.codex
+.agents
+data/*.zip
+tmp
+*.log
